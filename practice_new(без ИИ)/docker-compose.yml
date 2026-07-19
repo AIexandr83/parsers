@@ -1,0 +1,204 @@
+services:
+  postgres_db:
+    image: postgres:15-alpine
+    container_name: postgres_db
+    environment:
+      POSTGRES_USER: ${DB_USER:-cve_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-cve_password}
+      POSTGRES_DB: ${DB_NAME:-cve_database}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    networks:
+      - db_internal_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-cve_user} -d ${DB_NAME:-cve_database}"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+    restart: always
+
+  db_api:
+    build:
+      context: ./db_api
+    container_name: db_api
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER:-cve_user}:${DB_PASSWORD:-cve_password}@postgres_db:5432/${DB_NAME:-cve_database}
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+    networks:
+      - db_internal_net
+      - service_net
+    restart: always
+
+  nvd_parser:
+    build:
+      context: ./nvd_parser
+    container_name: nvd_parser
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DB_API_URL=http://db_api:8000
+    volumes:
+      - cve_repo_data:/app/cvelistV5
+    depends_on:
+      - db_api
+    networks:
+      - service_net
+      - external_net
+    restart: always
+
+  bdu_parser:
+    build:
+      context: ./bdu_parser
+    container_name: bdu_parser
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DB_API_URL=http://db_api:8000
+    depends_on:
+      - db_api
+    networks:
+      - service_net
+      - external_net
+    restart: always
+
+  germany_parser:
+    build:
+      context: ./germany_parser
+    container_name: germany_parser
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DB_API_URL=http://db_api:8000
+    volumes:
+      - germany_state:/app/state
+    depends_on:
+      - db_api
+    networks:
+      - service_net
+      - external_net
+    restart: always
+
+  japan_parser:
+    build:
+      context: ./japan_parser
+    container_name: japan_parser
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DB_API_URL=http://db_api:8000
+    volumes:
+      - japan_state:/app/state
+    depends_on:
+      - db_api
+    networks:
+      - service_net
+      - external_net
+    restart: always
+
+  korea_parser:
+    build:
+      context: ./korea_parser
+    container_name: korea_parser
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DB_API_URL=http://db_api:8000
+    depends_on:
+      - db_api
+    networks:
+      - service_net
+      - external_net
+    restart: always
+
+  spain_parser:
+    build:
+      context: ./spain_parser
+    container_name: spain_parser
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DB_API_URL=http://db_api:8000
+    volumes:
+      - spain_state:/app/state
+    depends_on:
+      - db_api
+    networks:
+      - service_net
+      - external_net
+    restart: always
+
+  canada_parser:
+    build:
+      context: ./canada_parser
+    container_name: canada_parser
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DB_API_URL=http://db_api:8000
+    volumes:
+      - canada_state:/app/state
+    depends_on:
+      - db_api
+    networks:
+      - service_net
+      - external_net
+    restart: always
+
+  exploitdb_parser:
+    build:
+      context: ./exploitdb_parser
+    container_name: exploitdb_parser
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DB_API_URL=http://db_api:8000
+    volumes:
+      - exploitdb_repo_data:/app/exploitdb
+    depends_on:
+      - db_api
+    networks:
+      - service_net
+      - external_net
+    restart: always
+
+  cisa_kev_parser:
+    build:
+      context: ./cisa_kev_parser
+    container_name: cisa_kev_parser
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DB_API_URL=http://db_api:8000
+    depends_on:
+      - db_api
+    networks:
+      - service_net
+      - external_net
+    restart: always
+
+  poc_github_parser:
+    build:
+      context: ./poc_github_parser
+    container_name: poc_github_parser
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DB_API_URL=http://db_api:8000
+    volumes:
+      - poc_github_repo_data:/app/poc_repo
+    depends_on:
+      - db_api
+    networks:
+      - service_net
+      - external_net
+    restart: always
+
+networks:
+  db_internal_net:
+    internal: true
+  service_net:
+    internal: true
+  external_net:
+    driver: bridge
+
+volumes:
+  pg_data:
+  cve_repo_data:
+  germany_state:
+  japan_state:
+  spain_state:
+  canada_state:
+  exploitdb_repo_data:
+  poc_github_repo_data:
